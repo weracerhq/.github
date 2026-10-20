@@ -1,0 +1,34 @@
+name: Bug
+description: Something doesn't work as it should.
+type: Bug
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens vs. what should happen
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "P0 · Data loss, outage or security: fix now"
+        - "P1 · Core feature broken, no workaround"
+        - "P2 · Annoying, has a workaround"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / environment
+      placeholder: "ios 0.1.0 (12) · staging"

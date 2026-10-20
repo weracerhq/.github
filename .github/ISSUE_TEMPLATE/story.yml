@@ -1,0 +1,24 @@
+name: Story
+description: Something a driver (or admin) needs, and why.
+type: Feature
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: As a … I want … so that …
+      placeholder: As a driver I want to log my laps without coverage so that I don't lose them.
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Given …, when …, then …
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes and out of scope
