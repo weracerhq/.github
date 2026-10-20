@@ -27,4 +27,5 @@ Issue forms, PR template, org profile and the reusable workflows every WeRacer r
 - `security-reviewer` (Opus): before merging auth, tokens, personal data, secrets, infra exposure or CI workflow changes.
 - Implementation agents (Sonnet): `backend-dev`, `mobile-dev`, `infra-dev`, `test-writer`.
 - Don't use Opus for routine coding. Don't read whole large files when grep will do. Keep at most 2–3 agents in parallel.
+- Codex sessions: the agents above are Claude-only; do the work directly and keep to the same rules.
 <!-- team-rules:end -->

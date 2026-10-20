@@ -8,34 +8,5 @@
   "enabledPlugins": {
     "kicad-happy@kicad-happy": false,
     "clangd-lsp@claude-plugins-official": false
-  },
-  "permissions": {
-    "allow": [
-      "Bash(git status:*)",
-      "Bash(git log:*)",
-      "Bash(git diff:*)",
-      "Bash(git show:*)",
-      "Bash(git fetch:*)",
-      "Bash(gh pr view:*)",
-      "Bash(gh pr list:*)",
-      "Bash(gh pr diff:*)",
-      "Bash(gh pr checks:*)",
-      "Bash(gh issue view:*)",
-      "Bash(gh issue list:*)",
-      "Bash(gh run list:*)",
-      "Bash(gh run view:*)",
-      "Bash(gh project item-list:*)",
-      "Bash(python3 -I .claude/skills/board/board.py show:*)",
-      "Bash(python3 -I .claude/skills/board/board.py sprints:*)",
-      "Bash(orca status:*)",
-      "Bash(orca worktree ps:*)",
-      "Bash(orca worktree list:*)",
-      "Bash(orca terminal list:*)",
-      "Bash(orca terminal read:*)",
-      "Bash(orca skills get:*)",
-      "Bash(orca orchestration check:*)",
-      "Bash(orca orchestration worker-list:*)",
-      "Bash(orca orchestration task-list:*)"
-    ]
   }
 }
