@@ -16,9 +16,9 @@ Issue forms, PR template, org profile and the reusable workflows every WeRacer r
 - Never add Claude attribution: no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" line in PRs, issues or comments.
 - Never mention other products or competitors by name in code, docs, issues or PRs.
 - Ask before anything destructive or hard to undo: force-push, history rewrite, deleting branches/data, changing org or repo settings, touching production.
-- English for code, comments, commits, issues and PRs. The architecture doc is in Spanish.
+- English for everything: code, comments, commits, issues, PRs and docs.
 
-**Context** — plan and architecture live in `weracerhq/docs` (`plan.md`, `architecture/arquitectura.md`, `decisions/`). Board: https://github.com/orgs/weracerhq/projects/1. Read only the sections you need.
+**Context** — plan and architecture live in `weracerhq/docs` (`plan.md`, `product/scope.md`, `architecture/`, `decisions/`). Board: https://github.com/orgs/weracerhq/projects/1. Read only the sections you need.
 
 **Model routing (save tokens)** — sessions run on Sonnet by default. Delegate:
 - `scout` (Haiku): searching code, reading CI logs, listing issues/PRs, summarizing long files or diffs.
