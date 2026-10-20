@@ -75,5 +75,7 @@ jobs:
         if: steps.detect.outputs.present == 'true'
         env:
           EXTRA_TASKS: ${{ inputs.extra-tasks }}
-        # EXTRA_TASKS is intentionally unquoted so it splits into separate tasks.
-        run: ./gradlew check ${EXTRA_TASKS} --continue --stacktrace
+        run: |
+          # EXTRA_TASKS is intentionally unquoted so it splits into separate tasks.
+          # shellcheck disable=SC2086
+          ./gradlew check ${EXTRA_TASKS} --continue --stacktrace

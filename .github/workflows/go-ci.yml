@@ -97,5 +97,7 @@ jobs:
       - name: go test
         env:
           TEST_ARGS: ${{ inputs.test-args }}
-        # TEST_ARGS is intentionally unquoted so it splits into separate flags.
-        run: go test ${TEST_ARGS} ./...
+        run: |
+          # TEST_ARGS is intentionally unquoted so it splits into separate flags.
+          # shellcheck disable=SC2086
+          go test ${TEST_ARGS} ./...
