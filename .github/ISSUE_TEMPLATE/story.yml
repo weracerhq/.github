@@ -1,6 +1,6 @@
 name: Story
 description: Something a driver (or admin) needs, and why.
-type: Feature
+type: Story
 body:
   - type: textarea
     id: story
