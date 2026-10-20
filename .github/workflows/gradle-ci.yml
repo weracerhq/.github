@@ -1,0 +1,79 @@
+# Reusable Gradle / Kotlin Multiplatform CI: JDK + Gradle cache, `./gradlew check`.
+# Skips cleanly (job passes with a notice) while the repo has no `gradlew` yet.
+#
+# Usage:
+#   jobs:
+#     gradle:
+#       uses: weracerhq/.github/.github/workflows/gradle-ci.yml@main
+#       with:
+#         extra-tasks: ":androidApp:assembleDebug"
+name: gradle-ci
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: JDK version (Temurin).
+        type: string
+        default: "17"
+      working-directory:
+        description: Directory containing `gradlew`.
+        type: string
+        default: .
+      extra-tasks:
+        description: Extra Gradle tasks/arguments appended after `check`.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-gradle-ci
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: gradle check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Detect Gradle project
+        id: detect
+        env:
+          WORKDIR: ${{ inputs.working-directory }}
+        run: |
+          if [ -f gradlew ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=gradle-ci skipped::No gradlew in '${WORKDIR}' yet; nothing to build."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        if: steps.detect.outputs.present == 'true'
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        if: steps.detect.outputs.present == 'true'
+        with:
+          # "basic" = plain actions/cache, free for private repos (the default
+          # "enhanced" provider is only a free preview for private repos).
+          cache-provider: basic
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: ./gradlew check
+        if: steps.detect.outputs.present == 'true'
+        env:
+          EXTRA_TASKS: ${{ inputs.extra-tasks }}
+        # EXTRA_TASKS is intentionally unquoted so it splits into separate tasks.
+        run: ./gradlew check ${EXTRA_TASKS} --continue --stacktrace

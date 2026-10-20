@@ -1,0 +1,127 @@
+# Reusable OpenAPI CI: Spectral lint + oasdiff breaking-change check.
+#
+# The breaking-change baseline is, in order of preference:
+#   1. the spec attached to the latest GitHub release (asset with the same file name), or
+#   2. the spec on the PR base branch (or `main` on push).
+# If neither exists (first version), the check is skipped with a notice.
+#
+# Usage:
+#   jobs:
+#     openapi:
+#       uses: weracerhq/.github/.github/workflows/openapi-ci.yml@main
+name: openapi-ci
+
+on:
+  workflow_call:
+    inputs:
+      spec:
+        description: Path to the OpenAPI document.
+        type: string
+        default: openapi.yaml
+      ruleset:
+        description: Spectral ruleset file.
+        type: string
+        default: .spectral.yaml
+      spectral-fail-severity:
+        description: Spectral --fail-severity (error, warn, info, hint).
+        type: string
+        default: warn
+      spectral-version:
+        description: "@stoplight/spectral-cli version."
+        type: string
+        default: 6.17.0
+      oasdiff-fail-on:
+        description: oasdiff breaking --fail-on level (ERR or WARN).
+        type: string
+        default: ERR
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-openapi-ci
+  cancel-in-progress: true
+
+env:
+  OASDIFF_VERSION: 1.34.0
+  OASDIFF_SHA256: 7c88e09fd500b231af2819eb21f6fdfc7bcdfe2741d2c1937c59e7b72c8a575a
+
+jobs:
+  lint:
+    name: spectral
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Spectral lint
+        env:
+          SPEC: ${{ inputs.spec }}
+          RULESET: ${{ inputs.ruleset }}
+          FAIL_SEVERITY: ${{ inputs.spectral-fail-severity }}
+          SPECTRAL_VERSION: ${{ inputs.spectral-version }}
+        run: |
+          npx --yes "@stoplight/spectral-cli@${SPECTRAL_VERSION}" lint "$SPEC" \
+            --ruleset "$RULESET" \
+            --fail-severity "$FAIL_SEVERITY" \
+            --format github-actions --format stylish
+
+  breaking:
+    name: oasdiff breaking
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fetch baseline spec
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPEC: ${{ inputs.spec }}
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/base"
+          base="$RUNNER_TEMP/base/$(basename "$SPEC")"
+          tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName 2>/dev/null || true)"
+          if [ -n "$tag" ] && gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+               --pattern "$(basename "$SPEC")" --dir "$RUNNER_TEMP/base" --clobber 2>/dev/null; then
+            echo "Baseline: $SPEC from release $tag"
+            echo "source=release $tag" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "pull_request" ] \
+               && gh api -H "Accept: application/vnd.github.raw" \
+                    "repos/$GITHUB_REPOSITORY/contents/$SPEC?ref=$BASE_REF" > "$base" 2>/dev/null; then
+            echo "Baseline: $SPEC from branch $BASE_REF"
+            echo "source=branch $BASE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=oasdiff skipped::No previous version of $SPEC (no release asset, no copy on base branch)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "path=$base" >> "$GITHUB_OUTPUT"
+
+      - name: Install oasdiff
+        if: steps.base.outputs.skip != 'true'
+        run: |
+          cd "$RUNNER_TEMP"
+          f="oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$f" "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/${f}"
+          echo "${OASDIFF_SHA256}  ${f}" | sha256sum --check --strict
+          tar -xzf "$f" oasdiff
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Breaking-change check
+        if: steps.base.outputs.skip != 'true'
+        env:
+          BASE: ${{ steps.base.outputs.path }}
+          SOURCE: ${{ steps.base.outputs.source }}
+          SPEC: ${{ inputs.spec }}
+          FAIL_ON: ${{ inputs.oasdiff-fail-on }}
+        run: |
+          echo "Comparing $SPEC against $SOURCE"
+          oasdiff changelog "$BASE" "$SPEC" | tee -a "$GITHUB_STEP_SUMMARY"
+          oasdiff breaking "$BASE" "$SPEC" --format githubactions --fail-on "$FAIL_ON"

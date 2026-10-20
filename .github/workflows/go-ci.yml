@@ -1,0 +1,101 @@
+# Reusable Go CI: golangci-lint, govulncheck, and `go test` against PostgreSQL 17 + PostGIS.
+#
+# Usage:
+#   jobs:
+#     go:
+#       uses: weracerhq/.github/.github/workflows/go-ci.yml@main
+name: go-ci
+
+on:
+  workflow_call:
+    inputs:
+      go-version-file:
+        description: Path to go.mod (Go version is read from its go/toolchain directive).
+        type: string
+        default: go.mod
+      golangci-lint-version:
+        description: golangci-lint version.
+        type: string
+        default: v2.15.0
+      govulncheck-version:
+        description: golang.org/x/vuln version providing govulncheck.
+        type: string
+        default: v1.9.0
+      postgres-image:
+        description: Postgres service image used by tests.
+        type: string
+        default: postgis/postgis:17-3.6
+      test-args:
+        description: Extra arguments for `go test`.
+        type: string
+        default: -race -count=1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-go-ci
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint + govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ inputs.golangci-lint-version }}
+
+      - name: govulncheck
+        env:
+          GOVULNCHECK_VERSION: ${{ inputs.govulncheck-version }}
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: ${{ inputs.postgres-image }}
+        env:
+          POSTGRES_USER: weracer
+          POSTGRES_PASSWORD: weracer
+          POSTGRES_DB: weracer_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U weracer -d weracer_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # CI-only throwaway credentials for the ephemeral service container.
+      DATABASE_URL: postgres://weracer:weracer@localhost:5432/weracer_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+
+      - name: Enable PostGIS
+        run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS postgis;' -c 'SELECT postgis_full_version();'
+
+      - name: go test
+        env:
+          TEST_ARGS: ${{ inputs.test-args }}
+        # TEST_ARGS is intentionally unquoted so it splits into separate flags.
+        run: go test ${TEST_ARGS} ./...

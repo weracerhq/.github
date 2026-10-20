@@ -1,0 +1,103 @@
+# Reusable infra validation: `kustomize build` each overlay + kubeconform.
+# CI only renders and validates manifests; it never talks to a cluster.
+# Overlays that don't exist (or have no kustomization file) are skipped; if none
+# exist the job passes with a notice.
+#
+# Usage:
+#   jobs:
+#     validate:
+#       uses: weracerhq/.github/.github/workflows/infra-validate.yml@main
+#       with:
+#         overlays: "staging production"
+name: infra-validate
+
+on:
+  workflow_call:
+    inputs:
+      overlays:
+        description: Space-separated directories to `kustomize build`.
+        type: string
+        default: staging production
+      kubernetes-version:
+        description: Kubernetes version for kubeconform schemas (e.g. 1.34.0); "master" = latest.
+        type: string
+        default: master
+      crd-schema-location:
+        description: Extra kubeconform schema location for CRDs (Flux, CNPG, ...).
+        type: string
+        default: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-infra-validate
+  cancel-in-progress: true
+
+env:
+  KUSTOMIZE_VERSION: 5.8.3
+  KUSTOMIZE_SHA256: cb9e31198d3f63b44848bd0afc4c8efc56e6cfef9c93a4a39a211940e6decd61
+  KUBECONFORM_VERSION: 0.8.0
+  KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+
+jobs:
+  validate:
+    name: kustomize + kubeconform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Find overlays
+        id: find
+        env:
+          OVERLAYS: ${{ inputs.overlays }}
+        run: |
+          found=""
+          for d in $OVERLAYS; do
+            if [ -f "$d/kustomization.yaml" ] || [ -f "$d/kustomization.yml" ] || [ -f "$d/Kustomization" ]; then
+              found="$found $d"
+            else
+              echo "Skipping '$d': no kustomization file."
+            fi
+          done
+          if [ -z "$found" ]; then
+            echo "::notice title=infra-validate skipped::No kustomization found in: $OVERLAYS"
+          fi
+          echo "dirs=${found# }" >> "$GITHUB_OUTPUT"
+
+      - name: Install kustomize and kubeconform
+        if: steps.find.outputs.dirs != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin" && cd "$RUNNER_TEMP/bin"
+          k="kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$k" "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/${k}"
+          echo "${KUSTOMIZE_SHA256}  ${k}" | sha256sum --check --strict
+          c="kubeconform-linux-amd64.tar.gz"
+          curl -fsSLo "$c" "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/${c}"
+          echo "${KUBECONFORM_SHA256}  ${c}" | sha256sum --check --strict
+          tar -xzf "$k" kustomize && tar -xzf "$c" kubeconform
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Build and validate
+        if: steps.find.outputs.dirs != ''
+        env:
+          DIRS: ${{ steps.find.outputs.dirs }}
+          K8S_VERSION: ${{ inputs.kubernetes-version }}
+          CRD_SCHEMAS: ${{ inputs.crd-schema-location }}
+        run: |
+          rc=0
+          for d in $DIRS; do
+            echo "::group::$d"
+            if ! kustomize build "$d" > "$RUNNER_TEMP/rendered.yaml"; then
+              echo "::error title=kustomize build failed::$d"; rc=1; echo "::endgroup::"; continue
+            fi
+            kubeconform -strict -summary -ignore-missing-schemas \
+              -kubernetes-version "$K8S_VERSION" \
+              -schema-location default -schema-location "$CRD_SCHEMAS" \
+              "$RUNNER_TEMP/rendered.yaml" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
