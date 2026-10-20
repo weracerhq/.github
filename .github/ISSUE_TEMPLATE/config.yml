@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Plan and architecture
+    url: https://github.com/weracerhq/docs
+    about: Current plan, architecture doc and decision records (team only).
