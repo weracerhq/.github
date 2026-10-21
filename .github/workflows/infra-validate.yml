@@ -29,9 +29,9 @@ on:
         default: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
       skip-kinds:
         description: >-
-          Comma-separated resource kinds kubeconform skips (letters and commas only), e.g. "Secret".
-          Use "Secret" only when Secrets are SOPS-encrypted (the extra `sops` key fails -strict);
-          plain Secrets are caught by the secret scan.
+          Comma-separated resource kinds kubeconform skips (letters only, no empty items), e.g. "Secret".
+          Use "Secret" only when Secrets are SOPS-encrypted (the extra `sops` key fails -strict),
+          and also run the gitleaks workflow, which does not reliably catch base64 data values.
         type: string
         default: ""
 
@@ -62,7 +62,11 @@ jobs:
         id: find
         env:
           OVERLAYS: ${{ inputs.overlays }}
+          SKIP_KINDS: ${{ inputs.skip-kinds }}
         run: |
+          if ! [[ "$SKIP_KINDS" =~ ^([A-Za-z]+(,[A-Za-z]+)*)?$ ]]; then
+            echo "::error title=Invalid skip-kinds::Use comma-separated kinds, letters only."; exit 1
+          fi
           found=""
           for d in $OVERLAYS; do
             if [ -f "$d/kustomization.yaml" ] || [ -f "$d/kustomization.yml" ] || [ -f "$d/Kustomization" ]; then
@@ -97,9 +101,6 @@ jobs:
           CRD_SCHEMAS: ${{ inputs.crd-schema-location }}
           SKIP_KINDS: ${{ inputs.skip-kinds }}
         run: |
-          if ! [[ "$SKIP_KINDS" =~ ^[A-Za-z,]*$ ]]; then
-            echo "::error title=Invalid skip-kinds::Only letters and commas are allowed."; exit 1
-          fi
           skip=()
           if [ -n "$SKIP_KINDS" ]; then skip=(-skip "$SKIP_KINDS"); fi
           rc=0
