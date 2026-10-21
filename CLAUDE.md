@@ -17,6 +17,7 @@ Issue forms, PR template, org profile and the reusable workflows every WeRacer r
 - Never mention other products or competitors by name in code, docs, issues or PRs.
 - Ask before anything destructive or hard to undo: force-push, history rewrite, deleting branches/data, changing org or repo settings, touching production.
 - English for everything: code, comments, commits, issues, PRs and docs.
+- Runner minutes are limited (Free plan: 2,000 a month for private repos). Run the repo's checks locally before pushing and push when they pass, not after every work-in-progress commit. Keep iOS builds local: macOS runners cost 10× the minutes.
 
 **Context** — plan and architecture live in `weracerhq/docs` (`plan.md`, `product/scope.md`, `architecture/`, `decisions/`). Board: https://github.com/orgs/weracerhq/projects/1. Read only the sections you need.
 
