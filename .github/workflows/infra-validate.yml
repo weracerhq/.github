@@ -9,6 +9,7 @@
 #       uses: weracerhq/.github/.github/workflows/infra-validate.yml@main
 #       with:
 #         overlays: "staging production"
+#         skip-kinds: "Secret"   # optional; only if Secrets are SOPS-encrypted
 name: infra-validate
 
 on:
@@ -26,6 +27,13 @@ on:
         description: Extra kubeconform schema location for CRDs (Flux, CNPG, ...).
         type: string
         default: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+      skip-kinds:
+        description: >-
+          Comma-separated resource kinds kubeconform skips (letters and commas only), e.g. "Secret".
+          Use "Secret" only when Secrets are SOPS-encrypted (the extra `sops` key fails -strict);
+          plain Secrets are caught by the secret scan.
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -87,7 +95,13 @@ jobs:
           DIRS: ${{ steps.find.outputs.dirs }}
           K8S_VERSION: ${{ inputs.kubernetes-version }}
           CRD_SCHEMAS: ${{ inputs.crd-schema-location }}
+          SKIP_KINDS: ${{ inputs.skip-kinds }}
         run: |
+          if ! [[ "$SKIP_KINDS" =~ ^[A-Za-z,]*$ ]]; then
+            echo "::error title=Invalid skip-kinds::Only letters and commas are allowed."; exit 1
+          fi
+          skip=()
+          if [ -n "$SKIP_KINDS" ]; then skip=(-skip "$SKIP_KINDS"); fi
           rc=0
           for d in $DIRS; do
             echo "::group::$d"
@@ -97,6 +111,7 @@ jobs:
             kubeconform -strict -summary -ignore-missing-schemas \
               -kubernetes-version "$K8S_VERSION" \
               -schema-location default -schema-location "$CRD_SCHEMAS" \
+              "${skip[@]}" \
               "$RUNNER_TEMP/rendered.yaml" || rc=1
             echo "::endgroup::"
           done
