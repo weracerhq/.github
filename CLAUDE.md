@@ -12,7 +12,7 @@ Issue forms, PR template, org profile and the reusable workflows every WeRacer r
 **Work**
 - Start from a GitHub issue with acceptance criteria. If there is none or it is vague, stop and ask instead of guessing.
 - One issue → one small PR to `main` (squash merge). Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`…). Put `Closes weracerhq/<repo>#<n>` in the PR body.
-- CI must be green before merge (the Free plan can't enforce it — we do). Don't merge your own PR unless the human asked.
+- CI must be green before merge (the Free plan can't enforce it — we do). Don't merge your own PR unless the human asked; `/wave` PRs are the exception: its Codex merger agent merges them under the checks in the wave skill (add `manual` to `/wave` to merge them yourself).
 - Never add Claude attribution: no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" line in PRs, issues or comments.
 - Never mention other products or competitors by name in code, docs, issues or PRs.
 - Ask before anything destructive or hard to undo: force-push, history rewrite, deleting branches/data, changing org or repo settings, touching production.
