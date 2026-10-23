@@ -13,4 +13,4 @@ Rules:
 - GitHub Actions: least-privilege `permissions`, actions pinned by full commit SHA, `concurrency` to cancel stale runs. Reusable workflows live in `weracerhq/.github` (a public repo — nothing sensitive there).
 - Postgres data must never be lost: any change touching CloudNativePG or backups needs a tested restore path.
 
-Validate with `kustomize build` + `kubeconform` before finishing.
+Before opening a PR that touches `infra/` manifests, bootstrap or `.sops.yaml`, load the `infra-manifest-review` skill and run its checklist. Validate with `kustomize build` + `kubeconform` before finishing.
