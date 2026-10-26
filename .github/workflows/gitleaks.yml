@@ -6,10 +6,21 @@
 #   jobs:
 #     gitleaks:
 #       uses: weracerhq/.github/.github/workflows/gitleaks.yml@main
+#
+# Runner (optional): defaults to GitHub-hosted ubuntu-latest. To pick another runner,
+# pass a JSON value for `runs-on`, e.g. a label list:
+#       with:
+#         runner: '["self-hosted","weracer"]'
+# Use a custom runner only from private repos, never from public ones.
 name: gitleaks
 
 on:
   workflow_call:
+    inputs:
+      runner:
+        description: JSON value for runs-on (a label string or a list of labels).
+        type: string
+        default: '"ubuntu-latest"'
 
 permissions:
   contents: read
@@ -25,7 +36,7 @@ env:
 jobs:
   scan:
     name: gitleaks
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
