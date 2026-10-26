@@ -7,6 +7,12 @@
 #       uses: weracerhq/.github/.github/workflows/gradle-ci.yml@main
 #       with:
 #         extra-tasks: ":androidApp:assembleDebug"
+#
+# Runner (optional): defaults to GitHub-hosted ubuntu-latest. To pick another runner,
+# pass a JSON value for `runs-on`, e.g. a label list:
+#       with:
+#         runner: '["self-hosted","weracer"]'
+# Use a custom runner only from private repos, never from public ones.
 name: gradle-ci
 
 on:
@@ -24,6 +30,10 @@ on:
         description: Extra Gradle tasks/arguments appended after `check`.
         type: string
         default: ""
+      runner:
+        description: JSON value for runs-on (a label string or a list of labels).
+        type: string
+        default: '"ubuntu-latest"'
 
 permissions:
   contents: read
@@ -35,7 +45,7 @@ concurrency:
 jobs:
   check:
     name: gradle check
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 45
     defaults:
       run:
