@@ -4,6 +4,12 @@
 #   jobs:
 #     go:
 #       uses: weracerhq/.github/.github/workflows/go-ci.yml@main
+#
+# Runner (optional): defaults to GitHub-hosted ubuntu-latest. To pick another runner,
+# pass a JSON value for `runs-on`, e.g. a label list:
+#       with:
+#         runner: '["self-hosted","weracer"]'
+# Use a custom runner only from private repos, never from public ones.
 name: go-ci
 
 on:
@@ -29,6 +35,10 @@ on:
         description: Extra arguments for `go test`.
         type: string
         default: -race -count=1
+      runner:
+        description: JSON value for runs-on (a label string or a list of labels).
+        type: string
+        default: '"ubuntu-latest"'
 
 permissions:
   contents: read
@@ -40,7 +50,7 @@ concurrency:
 jobs:
   lint:
     name: lint + govulncheck
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,7 +73,7 @@ jobs:
 
   test:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 20
     services:
       postgres:
