@@ -1,0 +1,4 @@
+# Workflow changes here run on the shared private runner for every repo that calls them,
+# so both owners review them (enforced by the main branch protection).
+/.github/workflows/ @raulmoranguerra @miguelmedinalazcano
+/.github/CODEOWNERS @raulmoranguerra @miguelmedinalazcano
