@@ -9,6 +9,9 @@
 #   jobs:
 #     openapi:
 #       uses: weracerhq/.github/.github/workflows/openapi-ci.yml@main
+#
+# Runner (optional): defaults to GitHub-hosted ubuntu-latest. To pick another runner, pass a JSON value
+# for `runs-on` (`runner: '["self-hosted","weracer"]'`). Use a custom runner only from private repos, never from public ones.
 name: openapi-ci
 
 on:
@@ -34,6 +37,10 @@ on:
         description: oasdiff breaking --fail-on level (ERR or WARN).
         type: string
         default: ERR
+      runner:
+        description: JSON value for runs-on (a label string or a list of labels).
+        type: string
+        default: '"ubuntu-latest"'
 
 permissions:
   contents: read
@@ -49,7 +56,7 @@ env:
 jobs:
   lint:
     name: spectral
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -70,7 +77,7 @@ jobs:
 
   breaking:
     name: oasdiff breaking
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
