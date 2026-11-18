@@ -12,7 +12,7 @@ Issue forms, PR template, org profile and the reusable workflows every WeRacer r
 **Work**
 - Start from a GitHub issue with acceptance criteria. If there is none or it is vague, stop and ask instead of guessing.
 - One issue → one small PR to `main` (squash merge). Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`…). Put `Closes weracerhq/<repo>#<n>` in the PR body.
-- CI must be green before merge (the Free plan can't enforce it — we do). Don't merge your own PR unless the human asked; `/wave` PRs are the exception: its Codex merger agent merges them under the checks in the wave skill (add `manual` to `/wave` to merge them yourself).
+- CI must be green before merge (the Free plan can't enforce it — we do). Don't merge your own PR unless the human asked; `/wave` PRs are the exception: its Codex merger agent merges them under the checks in the wave skill, and the wave coordinator merges mobile fast-path PRs with `merge-pr.sh` under the same checks (add `manual` to `/wave` to merge them yourself).
 - Never add Claude attribution: no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" line in PRs, issues or comments.
 - Never mention other products or competitors by name in code, docs, issues or PRs.
 - Ask before anything destructive or hard to undo: force-push, history rewrite, deleting branches/data, changing org or repo settings, touching production.
@@ -28,5 +28,5 @@ Issue forms, PR template, org profile and the reusable workflows every WeRacer r
 - `security-reviewer` (Opus): before merging auth, tokens, personal data, secrets, infra exposure or CI workflow changes.
 - Implementation agents (Sonnet): `backend-dev`, `mobile-dev`, `infra-dev`, `media-dev`, `test-writer`.
 - Don't use Opus for routine coding. Don't read whole large files when grep will do. Keep at most 2–3 agents in parallel.
-- Codex sessions: the agents above are Claude-only; do the work directly and keep to the same rules.
+- Codex sessions: the agents above are Claude-only; do the work directly. Codex workers read the same instructions through the `AGENTS.md` symlink to `CLAUDE.md` and follow the same rules.
 <!-- team-rules:end -->
