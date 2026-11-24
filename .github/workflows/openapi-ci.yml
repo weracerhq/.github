@@ -164,7 +164,7 @@ jobs:
           first="${PR_TITLE:-${COMMIT_MSG%%$'\n'*}}"
           text="${PR_BODY:-}"$'\n'"${COMMIT_MSG:-}"
           if printf '%s' "$first" | grep -Eq '^[a-zA-Z]+(\([^)]*\))?!:' \
-             || printf '%s' "$text" | grep -Eq '^BREAKING[ -]CHANGE: '; then
+             || printf '%s' "$text" | grep -E '^BREAKING[ -]CHANGE: +[^[:space:]]{3,}' | grep -Eqiv ': +(none|n/a|no)\.?[[:space:]]*$'; then
             echo "::warning title=oasdiff breaking::Breaking changes found, allowed because the change is marked as breaking (type!: or BREAKING CHANGE footer)."
             exit 0
           fi
