@@ -1,9 +1,13 @@
 # Reusable OpenAPI CI: Spectral lint + oasdiff breaking-change check.
 #
 # The breaking-change baseline is, in order of preference:
-#   1. the spec attached to the latest GitHub release (asset with the same file name), or
-#   2. the spec on the PR base branch (or `main` on push).
-# If neither exists (first version), the check is skipped with a notice.
+#   1. the spec on the PR base branch (or at the commit before a push), or
+#   2. the spec attached to the latest GitHub release (asset with the same file name).
+# If neither exists, the job fails (it never skips): a green check must mean a real comparison.
+#
+# A breaking change passes only when marked: a `feat!:`/`fix!:` PR title (head commit on push)
+# or a `BREAKING CHANGE:` footer in the PR body. The findings are still printed.
+# Run the same comparison locally: see the contract repo's CLAUDE.md.
 #
 # Usage:
 #   jobs:
@@ -96,28 +100,41 @@ jobs:
           SPEC: ${{ inputs.spec }}
           BASE_REF: ${{ github.base_ref || 'main' }}
           EVENT: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
+          set -u
+          if ! command -v gh >/dev/null; then
+            echo "::error title=oasdiff baseline::The gh CLI is not installed on this runner, so the baseline cannot be fetched."
+            exit 1
+          fi
           mkdir -p "$RUNNER_TEMP/base"
-          base="$RUNNER_TEMP/base/$(basename "$SPEC")"
-          tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName 2>/dev/null || true)"
-          if [ -n "$tag" ] && gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
-               --pattern "$(basename "$SPEC")" --dir "$RUNNER_TEMP/base" --clobber 2>/dev/null; then
+          name="$(basename "$SPEC")"
+          base="$RUNNER_TEMP/base/$name"
+          err="$RUNNER_TEMP/base/err.txt"
+          # Compare what this change alters: the PR base branch, or the commit before a push.
+          # Comparing with the last release would re-flag an already merged, marked breaking
+          # change on every later PR until the next release.
+          ref="$BASE_REF"
+          [ "$EVENT" = "pull_request" ] || ref="$BEFORE_SHA"
+          tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName 2>"$err" || true)"
+          if [ -n "$ref" ] && [ "${ref//0/}" != "" ] \
+             && gh api -H "Accept: application/vnd.github.raw" \
+                  "repos/$GITHUB_REPOSITORY/contents/$SPEC?ref=$ref" > "$base" 2>>"$err" \
+             && [ -s "$base" ]; then
+            echo "Baseline: $SPEC at $ref"
+            echo "source=$ref" >> "$GITHUB_OUTPUT"
+          elif [ -n "$tag" ] && gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+               --pattern "$name" --dir "$RUNNER_TEMP/base" --clobber 2>>"$err"; then
             echo "Baseline: $SPEC from release $tag"
             echo "source=release $tag" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT" = "pull_request" ] \
-               && gh api -H "Accept: application/vnd.github.raw" \
-                    "repos/$GITHUB_REPOSITORY/contents/$SPEC?ref=$BASE_REF" > "$base" 2>/dev/null; then
-            echo "Baseline: $SPEC from branch $BASE_REF"
-            echo "source=branch $BASE_REF" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice title=oasdiff skipped::No previous version of $SPEC (no release asset, no copy on base branch)."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error title=oasdiff baseline missing::No previous version of $SPEC (not at $ref, no release asset named $name). The check fails instead of skipping; fix the error below."
+            cat "$err" >&2
+            exit 1
           fi
           echo "path=$base" >> "$GITHUB_OUTPUT"
 
       - name: Install oasdiff
-        if: steps.base.outputs.skip != 'true'
         run: |
           cd "$RUNNER_TEMP"
           f="oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
@@ -127,13 +144,29 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       - name: Breaking-change check
-        if: steps.base.outputs.skip != 'true'
         env:
           BASE: ${{ steps.base.outputs.path }}
           SOURCE: ${{ steps.base.outputs.source }}
           SPEC: ${{ inputs.spec }}
           FAIL_ON: ${{ inputs.oasdiff-fail-on }}
+          # Untrusted text: only ever read as data from the environment, never interpolated into the script.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           echo "Comparing $SPEC against $SOURCE"
           oasdiff changelog "$BASE" "$SPEC" | tee -a "$GITHUB_STEP_SUMMARY"
-          oasdiff breaking "$BASE" "$SPEC" --format githubactions --fail-on "$FAIL_ON"
+          rc=0
+          oasdiff breaking "$BASE" "$SPEC" --format githubactions --fail-on "$FAIL_ON" || rc=$?
+          [ "$rc" -eq 0 ] && exit 0
+          # A reviewed breaking change is allowed through when it is marked: a `type!:` title
+          # (PR title on pull_request, head commit on push) or a `BREAKING CHANGE:` footer.
+          first="${PR_TITLE:-${COMMIT_MSG%%$'\n'*}}"
+          text="${PR_BODY:-}"$'\n'"${COMMIT_MSG:-}"
+          if printf '%s' "$first" | grep -Eq '^[a-zA-Z]+(\([^)]*\))?!:' \
+             || printf '%s' "$text" | grep -Eq '^BREAKING[ -]CHANGE: '; then
+            echo "::warning title=oasdiff breaking::Breaking changes found, allowed because the change is marked as breaking (type!: or BREAKING CHANGE footer)."
+            exit 0
+          fi
+          echo "::error title=oasdiff breaking::Unmarked breaking change. Mark it with a 'feat!:'/'fix!:' title or a 'BREAKING CHANGE:' footer in the PR body, then re-run the job (a title edit does not re-trigger it)."
+          exit "$rc"
