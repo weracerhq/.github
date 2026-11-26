@@ -85,6 +85,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
+          --tmpfs /var/lib/postgresql/data
           --health-cmd "pg_isready -U weracer -d weracer_test"
           --health-interval 5s
           --health-timeout 5s
@@ -100,6 +101,17 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ inputs.go-version-file }}
+
+      # The service DB is throwaway: skip fsync and WAL flushes so parallel test packages do not queue on disk writes.
+      - name: Tune test database for speed
+        run: |
+          psql "$DATABASE_URL" \
+            -c 'ALTER SYSTEM SET fsync = off' \
+            -c 'ALTER SYSTEM SET synchronous_commit = off' \
+            -c 'ALTER SYSTEM SET full_page_writes = off' \
+            -c 'ALTER SYSTEM SET max_wal_size = ''4GB''' \
+            -c 'ALTER SYSTEM SET checkpoint_timeout = ''30min''' \
+            -c 'SELECT pg_reload_conf()'
 
       - name: Enable PostGIS
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS postgis;' -c 'SELECT postgis_full_version();'
